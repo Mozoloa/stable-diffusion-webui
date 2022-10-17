@@ -6,6 +6,7 @@ import sys
 import torch
 import numpy as np
 from PIL import Image, ImageFilter, ImageOps
+from pillow_lut import load_cube_file
 import random
 import cv2
 from skimage import exposure
@@ -25,24 +26,12 @@ import logging
 opt_C = 4
 opt_f = 8
 
-
-def setup_color_correction(image):
-    logging.info("Calibrating color correction.")
-    correction_target = cv2.cvtColor(np.asarray(image.copy()), cv2.COLOR_RGB2LAB)
-    return correction_target
+lut = load_cube_file(os.path.join(os.getcwd(), 'ccLUT.CUBE'))
 
 
-def apply_color_correction(correction, image):
+def apply_color_correction(image):
     logging.info("Applying color correction.")
-    image = Image.fromarray(cv2.cvtColor(exposure.match_histograms(
-        cv2.cvtColor(
-            np.asarray(image),
-            cv2.COLOR_RGB2LAB
-        ),
-        correction,
-        channel_axis=2
-    ), cv2.COLOR_LAB2RGB).astype("uint8"))
-
+    image = image.filter(lut)
     return image
 
 
@@ -51,6 +40,7 @@ def get_correct_sampler(p):
         return sd_samplers.samplers
     elif isinstance(p, modules.processing.StableDiffusionProcessingImg2Img):
         return sd_samplers.samplers_for_img2img
+
 
 class StableDiffusionProcessing:
     def __init__(self, sd_model=None, outpath_samples=None, outpath_grids=None, prompt="", styles=None, seed=-1, subseed=-1, subseed_strength=0, seed_resize_from_h=-1, seed_resize_from_w=-1, seed_enable_extras=True, sampler_index=0, batch_size=1, n_iter=1, steps=50, cfg_scale=7.0, width=512, height=512, restore_faces=False, tiling=False, do_not_save_samples=False, do_not_save_grid=False, extra_generation_params=None, overlay_images=None, negative_prompt=None, eta=None, do_not_reload_embeddings=False):
@@ -321,7 +311,7 @@ def process_images(p: StableDiffusionProcessing) -> Processed:
     """this is the main loop that both txt2img and img2img use; it calls func_init once inside all the scopes and func_sample once per batch"""
 
     if type(p.prompt) == list:
-        assert(len(p.prompt) > 0)
+        assert (len(p.prompt) > 0)
     else:
         assert p.prompt is not None
 
@@ -375,7 +365,7 @@ def process_images(p: StableDiffusionProcessing) -> Processed:
         for n in range(p.n_iter):
             if state.skipped:
                 state.skipped = False
-            
+
             if state.interrupted:
                 break
 
@@ -438,10 +428,10 @@ def process_images(p: StableDiffusionProcessing) -> Processed:
 
                 image = Image.fromarray(x_sample)
 
-                if p.color_corrections is not None and i < len(p.color_corrections):
+                if p.color_corrections is not None:
                     if opts.save and not p.do_not_save_samples and opts.save_images_before_color_correction:
                         images.save_image(image, p.outpath_samples, "", seeds[i], prompts[i], opts.samples_format, info=infotext(n, i), p=p, suffix="-before-color-correction")
-                    image = apply_color_correction(p.color_corrections[i], image)
+                    image = apply_color_correction(image)
 
                 if p.overlay_images is not None and i < len(p.overlay_images):
                     overlay = p.overlay_images[i]
@@ -466,7 +456,7 @@ def process_images(p: StableDiffusionProcessing) -> Processed:
                     image.info["parameters"] = text
                 output_images.append(image)
 
-            del x_samples_ddim 
+            del x_samples_ddim
 
             devices.torch_gc()
 
@@ -537,7 +527,6 @@ class StableDiffusionProcessingTxt2Img(StableDiffusionProcessing):
             self.extra_generation_params["First pass size"] = f"{self.firstphase_width}x{self.firstphase_height}"
             self.truncate_x = int(self.firstphase_width - firstphase_width_truncated) // opt_f
             self.truncate_y = int(self.firstphase_height - firstphase_height_truncated) // opt_f
-
 
     def sample(self, conditioning, unconditional_conditioning, seeds, subseeds, subseed_strength):
         self.sampler = sd_samplers.create_sampler_with_index(sd_samplers.samplers, self.sampler_index, self.sd_model)

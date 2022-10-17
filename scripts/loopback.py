@@ -9,6 +9,7 @@ from modules.processing import Processed
 from modules.sd_samplers import samplers
 from modules.shared import opts, cmd_opts, state
 
+
 class Script(scripts.Script):
     def title(self):
         return "Loopback"
@@ -41,8 +42,6 @@ class Script(scripts.Script):
         original_init_image = p.init_images
         state.job_count = loops * batch_count
 
-        initial_color_corrections = [processing.setup_color_correction(p.init_images[0])]
-
         for n in range(batch_count):
             history = []
 
@@ -55,7 +54,7 @@ class Script(scripts.Script):
                 p.do_not_save_grid = True
 
                 if opts.img2img_color_correction:
-                    p.color_corrections = initial_color_corrections
+                    p.color_corrections = 1
 
                 state.job = f"Iteration {i + 1}/{loops}, batch {n + 1}/{batch_count}"
 

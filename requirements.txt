@@ -10,6 +10,7 @@ numpy
 omegaconf
 piexif
 Pillow
+pillow-lut
 pytorch_lightning
 realesrgan
 scikit-image>=0.19
