@@ -10,6 +10,7 @@ from pillow_lut import load_cube_file
 import random
 import cv2
 from skimage import exposure
+from typing import Any, Dict, List, Optional
 
 import modules.sd_hijack
 from modules import devices, prompt_parser, masking, sd_samplers, lowvram
@@ -40,6 +41,8 @@ def get_correct_sampler(p):
         return sd_samplers.samplers
     elif isinstance(p, modules.processing.StableDiffusionProcessingImg2Img):
         return sd_samplers.samplers_for_img2img
+    elif isinstance(p, modules.api.processing.StableDiffusionProcessingAPI):
+        return sd_samplers.samplers
 
 
 class StableDiffusionProcessing:
@@ -76,10 +79,10 @@ class StableDiffusionProcessing:
         self.denoising_strength: float = 0
         self.sampler_noise_scheduler_override = None
         self.ddim_discretize = opts.ddim_discretize
-        self.s_churn = opts.s_churn
-        self.s_tmin = opts.s_tmin
-        self.s_tmax = float('inf')  # not representable as a standard ui option
-        self.s_noise = opts.s_noise
+        self.s_churn = s_churn or opts.s_churn
+        self.s_tmin = s_tmin or opts.s_tmin
+        self.s_tmax = s_tmax or float('inf')  # not representable as a standard ui option
+        self.s_noise = s_noise or opts.s_noise
 
         if not seed_enable_extras:
             self.subseed = -1
@@ -392,12 +395,6 @@ def process_images(p: StableDiffusionProcessing) -> Processed:
             with devices.autocast():
                 samples_ddim = p.sample(conditioning=c, unconditional_conditioning=uc, seeds=seeds, subseeds=subseeds, subseed_strength=p.subseed_strength)
 
-            if state.interrupted or state.skipped:
-
-                # if we are interrupted, sample returns just noise
-                # use the image collected previously in sampler loop
-                samples_ddim = shared.state.current_latent
-
             samples_ddim = samples_ddim.to(devices.dtype_vae)
             x_samples_ddim = decode_first_stage(p.sd_model, samples_ddim)
             x_samples_ddim = torch.clamp((x_samples_ddim + 1.0) / 2.0, min=0.0, max=1.0)
@@ -487,7 +484,7 @@ def process_images(p: StableDiffusionProcessing) -> Processed:
 class StableDiffusionProcessingTxt2Img(StableDiffusionProcessing):
     sampler = None
 
-    def __init__(self, enable_hr=False, denoising_strength=0.75, firstphase_width=0, firstphase_height=0, **kwargs):
+    def __init__(self, enable_hr: bool = False, denoising_strength: float = 0.75, firstphase_width: int = 0, firstphase_height: int = 0, **kwargs):
         super().__init__(**kwargs)
         self.enable_hr = enable_hr
         self.denoising_strength = denoising_strength
